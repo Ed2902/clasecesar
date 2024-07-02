@@ -287,6 +287,56 @@ class Inventario {
             return 0; // O cualquier valor predeterminado si no hay datos
         }
     }
+
+    public function obtenerDetalleIngresos() {
+        $conexion = new Conexion();
+        try {
+            $consulta = $conexion->query(" SELECT 
+                    ing.id AS id_ingreso,
+                    ing.fecha_hora AS fecha_ingreso,
+                    p.id_producto AS id_producto,
+                    p.nombre AS nombre_producto,
+                    inv.peso AS peso,
+                    inv.valorPorKilo AS valor_por_kilo,
+                    u.nombre AS nombre_usuario,
+                    prov.nombre AS nombre_proveedor
+                FROM 
+                    ingreso ing
+                INNER JOIN 
+                    detalle_ingreso di ON ing.id = di.ingreso_id
+                INNER JOIN 
+                    inventario inv ON di.id_inventarioFK = inv.id_inventario
+                INNER JOIN 
+                    producto p ON inv.id_productoFK = p.id_producto
+                INNER JOIN 
+                    usuario u ON inv.id_usuario = u.id_usuario
+                INNER JOIN 
+                    proveedor prov ON inv.id_proveedor = prov.id_proveedor
+            ");
+    
+            // Verificar si la consulta devolvió resultados
+            if ($consulta === false) {
+                throw new PDOException('Error en la consulta SQL');
+            }
+    
+            $detalles = [];
+            if ($consulta->rowCount() > 0) {
+                while ($fila = $consulta->fetch(PDO::FETCH_ASSOC)) {
+                    $detalles[] = $fila;
+                }
+            } else {
+                error_log('No se encontraron registros en la consulta de ingresos.');
+            }
+    
+            return $detalles;
+        } catch (PDOException $e) {
+            error_log("Error al obtener detalles de ingresos: " . $e->getMessage());
+            return false; // Error
+        } finally {
+            $conexion = null;
+        }
+    }
+    
     
 }
 ?>
