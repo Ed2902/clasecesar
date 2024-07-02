@@ -93,8 +93,9 @@
                 </tfoot>
             </table>
         </div>
-        <!-- Botón de Agregar -->
+        <!-- Botones de Agregar y Editar Ingreso -->
         <a href="./ingresar_inventario.php" class="btn btn-success mt-3"><i class="fas fa-plus"></i> Agregar</a>
+        <a href="./tablageneral.php" class="btn btn-danger mt-3"><i class="fas fa-edit"></i> Ver y Editar Ingresos</a>
     </div>
 
     <!-- Agregar scripts de DataTables y Bootstrap al final del cuerpo del documento -->

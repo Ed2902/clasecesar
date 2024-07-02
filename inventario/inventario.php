@@ -337,6 +337,74 @@ class Inventario {
         }
     }
     
+    public function obtenerDetalleIngresosPorId($idIngreso) {
+        $conexion = new Conexion();
+        try {
+            $consulta = $conexion->prepare("SELECT 
+                    ing.id AS id_ingreso,
+                    ing.fecha_hora AS fecha_ingreso,
+                    p.id_producto AS id_producto,
+                    inv.id_usuario AS id_usuario,
+                    inv.peso AS peso,
+                    inv.valorPorKilo AS valor_por_kilo,
+                    inv.id_proveedor AS id_proveedor
+                FROM 
+                    ingreso ing
+                INNER JOIN 
+                    detalle_ingreso di ON ing.id = di.ingreso_id
+                INNER JOIN 
+                    inventario inv ON di.id_inventarioFK = inv.id_inventario
+                INNER JOIN 
+                    producto p ON inv.id_productoFK = p.id_producto
+                WHERE 
+                    ing.id = :idIngreso");
+            $consulta->bindParam(':idIngreso', $idIngreso);
+            $consulta->execute();
+    
+            $detalle = $consulta->fetch(PDO::FETCH_ASSOC);
+            return $detalle;
+        } catch (PDOException $e) {
+            error_log("Error al obtener detalles de ingresos: " . $e->getMessage());
+            return false; // Error
+        } finally {
+            $conexion = null;
+        }
+    }
+
+    public function editar($idIngreso, $id_productoFK, $id_usuarioFK, $peso, $id_proveedorFK, $valorPorKilo) {
+        $conexion = new Conexion();
+        
+        try {
+            $conexion->beginTransaction();
+    
+            // Actualizar los datos en la tabla 'inventario'
+            $consultaInventario = $conexion->prepare("UPDATE inventario SET 
+                id_productoFK = :id_productoFK, 
+                id_usuario = :id_usuario, 
+                peso = :peso, 
+                id_proveedor = :id_proveedor, 
+                valorPorKilo = :valorPorKilo 
+                WHERE id_inventario = (SELECT id_inventarioFK FROM detalle_ingreso WHERE ingreso_id = :idIngreso)");
+            $consultaInventario->bindParam(':id_productoFK', $id_productoFK);
+            $consultaInventario->bindParam(':id_usuario', $id_usuarioFK);
+            $consultaInventario->bindParam(':peso', $peso);
+            $consultaInventario->bindParam(':id_proveedor', $id_proveedorFK);
+            $consultaInventario->bindParam(':valorPorKilo', $valorPorKilo);
+            $consultaInventario->bindParam(':idIngreso', $idIngreso);
+            $consultaInventario->execute();
+    
+            // Confirmar la transacción
+            $conexion->commit();
+    
+            return true; // Éxito
+        } catch (PDOException $e) {
+            // Revertir la transacción si hay un error
+            $conexion->rollback();
+            error_log("Error al editar inventario: " . $e->getMessage());
+            return false; // Error
+        }
+    }
     
 }
+
 ?>
