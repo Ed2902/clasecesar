@@ -5,13 +5,19 @@ require_once("../conexion.php");
 class Ingreso {
     protected $suma_total_kilos;
     protected $fecha_hora;
+    protected $factura;
+    protected $ordenCompra;
+    protected $reciboPago;
 
-    public function __construct($suma_total_kilos, $fecha_hora = null) {
+    public function __construct($suma_total_kilos, $fecha_hora = null, $factura = null, $ordenCompra = null, $reciboPago = null) {
         $this->suma_total_kilos = $suma_total_kilos;
         $this->fecha_hora = $fecha_hora ? $fecha_hora : date("Y-m-d H:i:s");
+        $this->factura = $factura;
+        $this->ordenCompra = $ordenCompra;
+        $this->reciboPago = $reciboPago;
     }
 
-    // Getters y setters
+    // Getters y setters para suma_total_kilos y fecha_hora
     public function getSumaTotalKilos() {
         return $this->suma_total_kilos;
     }
@@ -26,6 +32,31 @@ class Ingreso {
 
     public function setFechaHora($fecha_hora) {
         $this->fecha_hora = $fecha_hora;
+    }
+
+    // Getters y setters para factura, ordenCompra y reciboPago
+    public function getFactura() {
+        return $this->factura;
+    }
+
+    public function setFactura($factura) {
+        $this->factura = $factura;
+    }
+
+    public function getOrdenCompra() {
+        return $this->ordenCompra;
+    }
+
+    public function setOrdenCompra($ordenCompra) {
+        $this->ordenCompra = $ordenCompra;
+    }
+
+    public function getReciboPago() {
+        return $this->reciboPago;
+    }
+
+    public function setReciboPago($reciboPago) {
+        $this->reciboPago = $reciboPago;
     }
 
     public function guardar() {
@@ -54,6 +85,7 @@ class Ingreso {
             return false; // Error
         }
     }
+
     public function mostrarIngresos() {
         $conexion = new Conexion();
         $consulta = $conexion->query("SELECT * FROM ingreso");
@@ -92,6 +124,106 @@ class Ingreso {
         $conexion = null;
         return $productos;
     }
+    
+    public function obtenerDetalleIngreso($idIngreso) {
+        $conexion = new Conexion();
+        try {
+            $consulta = $conexion->prepare(" SELECT 
+                    ing.id AS id_ingreso,
+                    ing.fecha_hora AS fecha_ingreso,
+                    p.id_producto AS id_producto,
+                    p.nombre AS nombre_producto,
+                    inv.peso AS peso,
+                    inv.valorPorKilo AS valor_por_kilo,
+                    u.nombre AS nombre_usuario,
+                    prov.nombre AS nombre_proveedor
+                FROM 
+                    ingreso ing
+                INNER JOIN 
+                    detalle_ingreso di ON ing.id = di.ingreso_id
+                INNER JOIN 
+                    inventario inv ON di.id_inventarioFK = inv.id_inventario
+                INNER JOIN 
+                    producto p ON inv.id_productoFK = p.id_producto
+                INNER JOIN 
+                    usuario u ON inv.id_usuario = u.id_usuario
+                INNER JOIN 
+                    proveedor prov ON inv.id_proveedor = prov.id_proveedor
+                WHERE 
+                    ing.id = :idIngreso
+            ");
+            $consulta->bindParam(':idIngreso', $idIngreso, PDO::PARAM_INT);
+            $consulta->execute();
+    
+            // Verificar si la consulta devolvió resultados
+            if ($consulta === false) {
+                throw new PDOException('Error en la consulta SQL');
+            }
+    
+            $detalles = [];
+            if ($consulta->rowCount() > 0) {
+                while ($fila = $consulta->fetch(PDO::FETCH_ASSOC)) {
+                    $detalles[] = $fila;
+                }
+            } else {
+                error_log('No se encontraron registros en la consulta de ingresos.');
+            }
+    
+            return $detalles;
+        } catch (PDOException $e) {
+            error_log("Error al obtener detalles de ingresos: " . $e->getMessage());
+            return false; // Error
+        } finally {
+            $conexion = null;
+        }
+    }
+    
+    public function subirArchivo($id, $campo, $archivo) {
+        // Determinar la carpeta de destino según el campo
+        $carpetaDestino = '';
+        if ($campo === 'factura') {
+            $carpetaDestino = 'documentos/factura/';
+        } elseif ($campo === 'ordenCompra') {
+            $carpetaDestino = 'documentos/ordencompra/';
+        } elseif ($campo === 'reciboPago') {
+            $carpetaDestino = 'documentos/recibopago/';
+        }
+    
+        // Verificar si la carpeta de destino existe, si no, crearla
+        if (!is_dir($carpetaDestino)) {
+            mkdir($carpetaDestino, 0777, true);
+        }
+    
+        // Obtener la extensión del archivo
+        $fileExtension = strtolower(pathinfo($archivo["name"], PATHINFO_EXTENSION));
+    
+        // Verificar si el archivo es un documento permitido
+        $allowedExtensions = ["pdf", "doc", "docx", "txt", "jpeg", "jpg"];
+        if (!in_array($fileExtension, $allowedExtensions)) {
+            return "Solo se permiten archivos PDF, DOC, DOCX, TXT, JPEG y JPG.";
+        }
+    
+        // Crear el nuevo nombre del archivo
+        $nuevoNombre = $id . '_' . $campo . '.' . $fileExtension;
+        $targetFile = $carpetaDestino . $nuevoNombre;
+    
+        // Verificar si hubo algún error al subir el archivo
+        if (move_uploaded_file($archivo["tmp_name"], $targetFile)) {
+            // Actualizar la base de datos con la ruta del archivo subido
+            try {
+                $conexion = new Conexion();
+                $consulta = $conexion->prepare("UPDATE ingreso SET $campo = :ruta WHERE id = :id");
+                $consulta->bindParam(':ruta', $targetFile);
+                $consulta->bindParam(':id', $id);
+                $consulta->execute();
+                return "El archivo " . htmlspecialchars($nuevoNombre) . " ha sido subido y guardado en la base de datos.";
+            } catch (PDOException $e) {
+                return "Error al actualizar la base de datos: " . $e->getMessage();
+            }
+        } else {
+            return "Hubo un error al subir el archivo.";
+        }
+    }
+    
 }
 ?>
-
