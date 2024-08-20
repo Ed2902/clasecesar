@@ -224,6 +224,35 @@ class Ingreso {
             return "Hubo un error al subir el archivo.";
         }
     }
-    
+
+    public function obtenerDocumentosIngreso($idIngreso) {
+        $conexion = new Conexion();
+        try {
+            $consulta = $conexion->prepare("SELECT factura, ordenCompra, reciboPago FROM ingreso WHERE id = :idIngreso");
+            $consulta->bindParam(':idIngreso', $idIngreso, PDO::PARAM_INT);
+            $consulta->execute();
+
+            $documentos = $consulta->fetch(PDO::FETCH_ASSOC);
+            return $documentos;
+        } catch (PDOException $e) {
+            error_log("Error al obtener documentos de ingresos: " . $e->getMessage());
+            return false; // Error
+        } finally {
+            $conexion = null;
+        }
+    }
+
+    public function sumarValoresPorKilo($idIngreso) {
+        $conexion = new Conexion();
+        $consulta = $conexion->prepare("SELECT SUM(i.valorPorKilo * i.peso)
+                                        FROM detalle_ingreso di
+                                        INNER JOIN inventario i ON di.id_inventarioFK = i.id_inventario
+                                        WHERE di.ingreso_id = :idIngreso");
+        $consulta->bindParam(':idIngreso', $idIngreso, PDO::PARAM_INT);
+        $consulta->execute();
+        $suma = $consulta->fetchColumn();
+        $conexion = null;
+        return $suma;
+    }
 }
 ?>

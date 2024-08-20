@@ -49,12 +49,11 @@ function agregar() {
     // Agregar fila a la tabla
     $("#lista").append(fila);
 
-    // Limpiar formulario
+    // Limpiar formulario, pero mantener el valor de id_usuarioFK
     $("#id_productoFK").val('');
     $("#nombre").val('');
     $("#referencia").val('');
     $("#tipo").val('');
-    $("#id_usuarioFK").val('');
     $("#peso").val('');
     $("#id_proveedorFK").val('');
     $("#valorPorKilo").val('');
@@ -115,7 +114,7 @@ function prepararDatosParaEnvio(data) {
 // Función para enviar los datos al servidor
 function save() {
     var dataToSend = prepararDatosParaEnvio(data);
-    var json = JSON.stringify(data);  // Convertir array de datos a formato JSON
+    var json = JSON.stringify(dataToSend);  // Convertir array de datos a formato JSON
     console.log("JSON a enviar:", json); 
 
     // Crear una solicitud AJAX

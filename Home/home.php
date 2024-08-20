@@ -60,10 +60,10 @@
       </div>
     </nav>
 
-    <div id="bootstrap-sidebar" class="dark-theme icon-menu">
+   <!--  <div id="bootstrap-sidebar" class="dark-theme icon-menu">
       <ul class="sidebar-nav">
         <li class="active" data-tooltip="Inicio"> <a href="../index.html"><span class="glyphicon glyphicon-home" aria-hidden="true"></span> <span class="menu-text">Inicio</span></a></li>
-        <li data-tooltip="Consulta Categoría"> <a href="../dasboard/das_espaciocliente.php"><span class="glyphicon glyphicon-signal" aria-hidden="true"></span> <span class="menu-text">Consulta Categoría</span></a></li>
+        <li data-tooltip="Consulta Categoría"> <a href="../dasboard/das_espaciocliente.php"><span class="glyphicon glyphicon-signal" aria-hidden="true"></span> <span class="menu-text">Consulta Categoría</span></a></li> -->
         <!-- <li data-tooltip="Reportes"> <a href="/Tablas/CompraMostrar.php"><span class="glyphicon glyphicon-file" aria-hidden="true"></span> <span class="menu-text">Reportes</span></a></li>
         <li data-tooltip="Catálogo"> <a href="#"><span class="glyphicon glyphicon-list" aria-hidden="true"></span> <span class="menu-text">Catálogo</span></a></li> -->
         <!-- <li data-tooltip="Bandeja de entrada"> <a href="#"><span class="glyphicon glyphicon-inbox" aria-hidden="true"></span> <span class="menu-text">Bandeja de entrada</span></a></li>
@@ -131,21 +131,21 @@
                 </div>
                 <div class="col-md-3">
                   <div class="panel panel-primary">
-                    <div class="panel-body text-center" onclick="location.href='../clientela/tabla.php'" data-tooltip="Agregar Producto">
+                    <div class="panel-body text-center" onclick="location.href='../producto/tabla_productos.php'" data-tooltip="Agregar Producto">
                       <span class="glyphicon glyphicon-plus icon-big" aria-hidden="true"></span>
                       <h3>Productos</h3>
                     </div>
                   </div>
                 </div>
-                <!-- <div class="col-md-3">
+                 <div class="col-md-3">
                   <div class="panel panel-primary">
-                    <div class="panel-body text-center" onclick="location.href='../Tablas/editar_inventario.html'" data-tooltip="Editar Inventario">
+                    <div class="panel-body text-center" onclick="location.href='../clientela/tabla.php'" data-tooltip="Editar Inventario">
                       <span class="glyphicon glyphicon-book icon-big" aria-hidden="true"></span>
-                      <h3>Editar Inventario</h3>
+                      <h3>Clientes</h3>
                     </div>
                   </div>
                 </div>
-                <div class="col-md-3">
+                <!-- <div class="col-md-3">
                   <div class="panel panel-primary">
                     <div class="panel-body text-center" onclick="location.href='../clientes/crearcliente.html'" data-tooltip="Ver clientes">
                       <span class="glyphicon glyphicon-check icon-big" aria-hidden="true"></span>

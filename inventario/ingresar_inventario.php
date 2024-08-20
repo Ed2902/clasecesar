@@ -21,6 +21,25 @@ $proveedores = Ingreso::obtenerProveedores();
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-EVSTQN3/azprG1Anm3QDgpJLIm9Nao0Yz1ztcQTwFspd3yD65VohhpuuCOmLASjC" crossorigin="anonymous">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <link rel="stylesheet" href="../css/styles.css">
+
+    <!-- Estilos personalizados para asegurar que el modal se muestre por encima de todo -->
+    <style>
+        .modal-backdrop {
+            z-index: 1050; /* Debe estar por encima de otros elementos */
+        }
+
+        .modal {
+            z-index: 1060; /* Asegúrate de que el modal esté por encima del backdrop */
+        }
+
+        /* Esto asegura que el contenido del modal esté bien centrado y visible */
+        .modal-dialog-centered {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh; /* Esto asegura que el modal esté centrado verticalmente */
+        }
+    </style>
 </head>
 <body>
     <div class="container-fluid">
@@ -104,6 +123,9 @@ $proveedores = Ingreso::obtenerProveedores();
                                         <th>Acciones</th>
                                     </tr>
                                 </thead>
+                                <tbody>
+                                    <!-- Aquí se agregarán dinámicamente las filas -->
+                                </tbody>
                             </table>
                         </div>
                     </div>
@@ -120,7 +142,7 @@ $proveedores = Ingreso::obtenerProveedores();
 
     <!-- Modal -->
     <div class="modal fade" id="productModal" tabindex="-1" aria-labelledby="productModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-lg">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title" id="productModalLabel">Seleccionar Producto</h5>
@@ -147,26 +169,6 @@ $proveedores = Ingreso::obtenerProveedores();
     </div>
 
     <script>
-        document.getElementById('id_productoFK').addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') {
-                var idProducto = document.getElementById('id_productoFK').value;
-                fetch('./obtener_producto.php?id=' + idProducto)
-                    .then(response => response.json())
-                    .then(data => {
-                        if (data.success) {
-                            document.getElementById('nombre').value = data.producto.nombre;
-                            document.getElementById('referencia').value = data.producto.referencia;
-                            document.getElementById('tipo').value = data.producto.tipo;
-                        } else {
-                            alert('No se encontró el producto con el ID proporcionado.');
-                        }
-                    })
-                    .catch(error => {
-                        console.error('Error:', error);
-                    });
-            }
-        });
-
         document.addEventListener('DOMContentLoaded', function() {
             // Fetch and populate product data in the modal
             fetch('./obtenertodoslospro.php')
@@ -181,7 +183,7 @@ $proveedores = Ingreso::obtenerProveedores();
                                 <td>${producto.nombre}</td>
                                 <td>${producto.referencia}</td>
                                 <td>${producto.tipo}</td>
-                                <td><button type='button' class='btn btn-primary select-product' data-id='${producto.id_producto}'>Seleccionar</button></td>
+                                <td><button type='button' class='btn btn-primary select-product' data-id='${producto.id_producto}' data-nombre='${producto.nombre}' data-referencia='${producto.referencia}' data-tipo='${producto.tipo}'>Seleccionar</button></td>
                             `;
                             productTableBody.appendChild(row);
                         });
@@ -198,26 +200,27 @@ $proveedores = Ingreso::obtenerProveedores();
                 document.querySelectorAll('.select-product').forEach(button => {
                     button.addEventListener('click', function() {
                         var idProducto = this.getAttribute('data-id');
+                        var nombre = this.getAttribute('data-nombre');
+                        var referencia = this.getAttribute('data-referencia');
+                        var tipo = this.getAttribute('data-tipo');
+
+                        // Colocar los valores en el formulario
                         document.getElementById('id_productoFK').value = idProducto;
-                        fetch('./obtenertodoslospro.php?id=' + idProducto)
-                            .then(response => response.json())
-                            .then(data => {
-                                if (data.success) {
-                                    document.getElementById('nombre').value = data.producto.nombre;
-                                    document.getElementById('referencia').value = data.producto.referencia;
-                                    document.getElementById('tipo').value = data.producto.tipo;
-                                } else {
-                                    alert('No se encontró el producto con el ID proporcionado.');
-                                }
-                            })
-                            .catch(error => {
-                                console.error('Error:', error);
-                            });
+                        document.getElementById('nombre').value = nombre;
+                        document.getElementById('referencia').value = referencia;
+                        document.getElementById('tipo').value = tipo;
+
+                        // Cerrar el modal
                         var modal = bootstrap.Modal.getInstance(document.getElementById('productModal'));
                         modal.hide();
                     });
                 });
             }
+        });
+
+        // Asegurarnos de que el ID del usuario siempre aparezca cuando se presione el botón "Agregar"
+        document.getElementById('agregar').addEventListener('click', function() {
+            document.getElementById('id_usuarioFK').value = "<?php echo $user_id; ?>";
         });
 
     </script>

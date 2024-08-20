@@ -9,8 +9,19 @@ try {
     $ingreso = new Ingreso(0); // La suma_total_kilos no es relevante aquí
     $ingresos = $ingreso->mostrarIngresos();
 } catch (Exception $e) {
-    $error = $e->getMessage();  
+    $error = $e->getMessage();
 }
+
+// Obtener la suma de valores por kilo para cada ingreso
+foreach ($ingresos as &$ingreso) {
+    try {
+        $ingresoObj = new Ingreso(0);
+        $ingreso['suma_valores_por_kilo'] = $ingresoObj->sumarValoresPorKilo($ingreso['id']);
+    } catch (Exception $e) {
+        $ingreso['suma_valores_por_kilo'] = 0;
+    }
+}
+unset($ingreso); // Desreferenciar la variable para evitar conflictos
 
 // Manejar la subida de archivos
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['archivo'])) {
@@ -39,6 +50,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['detalle_id'])) {
     }
     exit;
 }
+
+// Obtener documentos de ingreso para el modal
+if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['documentos_id'])) {
+    try {
+        $ingreso = new Ingreso(0); // La suma_total_kilos no es relevante aquí
+        $documentos = $ingreso->obtenerDocumentosIngreso($_GET['documentos_id']);
+        echo json_encode($documentos);
+    } catch (Exception $e) {
+        echo json_encode(['error' => $e->getMessage()]);
+    }
+    exit;
+}
 ?>
 <!DOCTYPE html>
 <html lang="es">
@@ -46,252 +69,122 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['detalle_id'])) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Tabla de Datos</title>
-    <style>
-        table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-        th, td {
-            border: 1px solid #ddd;
-            padding: 8px;
-            text-align: center;
-        }
-        th {
-            background-color: #f2f2f2;
-        }
-        .modal {
-            display: none; 
-            position: fixed; 
-            z-index: 1; 
-            padding-top: 60px; 
-            left: 0;
-            top: 0;
-            width: 100%; 
-            height: 100%; 
-            overflow: auto; 
-            background-color: rgb(0,0,0); 
-            background-color: rgba(0,0,0,0.4); 
-        }
-        .modal-content {
-            background-color: #fefefe;
-            margin: 5% auto; 
-            padding: 20px;
-            border: 1px solid #888;
-            width: 80%; 
-        }
-        .close {
-            color: #aaa;
-            float: right;
-            font-size: 28px;
-            font-weight: bold;
-        }
-        .close:hover,
-        .close:focus {
-            color: black;
-            text-decoration: none;
-            cursor: pointer;
-        }
-    </style>
+    <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.datatables.net/1.11.5/css/dataTables.bootstrap4.min.css" rel="stylesheet">
+    <link href="https://cdn.datatables.net/colreorder/1.5.2/css/colReorder.bootstrap4.min.css" rel="stylesheet">
+    <link href="https://cdn.datatables.net/buttons/1.7.1/css/buttons.bootstrap4.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+    <link rel="stylesheet" href="../css/styles.css">
 </head>
+
 <body>
+    <div class="container-fluid" style="width: 90%;">
+        <a href="../Home/home.php" style="text-decoration: none;">
+            <button type="button" class="btn btn-light mr-2" style="border-radius: 50%;">
+                <i class="fas fa-home" style="font-size: 20px; color:#fe5000;"></i>
+            </button>
+        </a>
+        <h1 class="mt-5 mb-3">Tabla de Datos</h1>
 
-<table>
-    <thead>
-        <tr>
-            <th>ID</th>
-            <th>Fecha y Hora</th>
-            <th>Suma Total Kilos</th>
-            <th>Factura</th>
-            <th>Orden de Compra</th>
-            <th>Recibo de Pago</th>
-            <th>Detalle</th>
-            <th>Acciones</th>
-        </tr>
-    </thead>
-    <tbody id="data-table">
-        <?php if (!empty($ingresos)): ?>
-            <?php foreach ($ingresos as $ingreso): ?>
-                <tr>
-                    <td><?= htmlspecialchars($ingreso['id']) ?></td>
-                    <td><?= htmlspecialchars($ingreso['fecha_hora']) ?></td>
-                    <td><?= htmlspecialchars($ingreso['suma_total_kilos']) ?></td>
-                    <td>
-                        <?php if ($ingreso['factura']): ?>
-                            <a href="<?= htmlspecialchars($ingreso['factura']) ?>" target="_blank">Ver documento</a>
-                        <?php else: ?>
-                            <input type="file" name="archivo_factura_<?= htmlspecialchars($ingreso['id']) ?>" />
-                            <button onclick="saveFile(<?= htmlspecialchars($ingreso['id']) ?>, 'archivo_factura')">Guardar</button>
-                        <?php endif; ?>
-                    </td>
-                    <td>
-                        <?php if ($ingreso['ordenCompra']): ?>
-                            <a href="<?= htmlspecialchars($ingreso['ordenCompra']) ?>" target="_blank">Ver documento</a>
-                        <?php else: ?>
-                            <input type="file" name="archivo_ordenCompra_<?= htmlspecialchars($ingreso['id']) ?>" />
-                            <button onclick="saveFile(<?= htmlspecialchars($ingreso['id']) ?>, 'archivo_ordenCompra')">Guardar</button>
-                        <?php endif; ?>
-                    </td>
-                    <td>
-                        <?php if ($ingreso['reciboPago']): ?>
-                            <a href="<?= htmlspecialchars($ingreso['reciboPago']) ?>" target="_blank">Ver documento</a>
-                        <?php else: ?>
-                            <input type="file" name="archivo_reciboPago_<?= htmlspecialchars($ingreso['id']) ?>" />
-                            <button onclick="saveFile(<?= htmlspecialchars($ingreso['id']) ?>, 'archivo_reciboPago')">Guardar</button>
-                        <?php endif; ?>
-                    </td>
-                    <td><button onclick="showDetails(<?= htmlspecialchars($ingreso['id']) ?>)">Detalle</button></td>
-                    <td><button onclick="editData(<?= htmlspecialchars($ingreso['id']) ?>)">Editar</button></td>
-                </tr>
-            <?php endforeach; ?>
-        <?php else: ?>
-            <tr>
-                <td colspan="8">No hay datos disponibles</td>
-            </tr>
-        <?php endif; ?>
-    </tbody>
-</table>
+        <!-- Contenedor flex para los botones a la izquierda y la fecha a la derecha -->
+        <div class="d-flex mb-3">
+        <div>
+            <a href="../inventario/ingresar_inventario.php" class="btn btn-success mr-2">
+                <span class="me-2">+</span> Agregar
+            </a>
+            <a href="../inventario/tablageneral.php" class="btn btn-warning">
+                Editar Inventario
+            </a>
+        </div>
+            <div class="ml-auto">
+                <div class="form-group">
+                    <label for="dateRange">Rango de Fechas:</label>
+                    <div class="input-group">
+                        <input type="text" id="dateRange" class="form-control">
+                        <div class="input-group-append">
+                            <span class="input-group-text">
+                                <i class="fas fa-calendar-alt"></i>
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
 
-<!-- Modal -->
-<div id="detailModal" class="modal">
-    <div class="modal-content">
-        <span class="close">&times;</span>
-        <div id="modal-body">
-            <!-- Contenido relacionado al ID se mostrará aquí -->
+        <div class="table-responsive">
+            <table id="data-table" class="table table-striped table-bordered">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Fecha y Hora</th>
+                        <th>Suma Total Kilos</th>
+                        <th>Suma de Valores por Kilo</th>
+                        <th>Documentos</th>
+                        <th>Detalle</th>
+                    </tr>
+                </thead>
+                <tbody id="data-table-body">
+                    <?php if (!empty($ingresos)): ?>
+                        <?php foreach ($ingresos as $ingreso): ?>
+                            <?php
+                                $todosDocumentos = $ingreso['factura'] && $ingreso['ordenCompra'] && $ingreso['reciboPago'];
+                                $algunDocumento = $ingreso['factura'] || $ingreso['ordenCompra'] || $ingreso['reciboPago'];
+                                $icono = $todosDocumentos ? '✔' : ($algunDocumento ? '!' : '✘');
+                                $claseIcono = $todosDocumentos ? 'green' : ($algunDocumento ? 'yellow' : 'red');
+                            ?>
+                            <tr>
+                                <td><?= htmlspecialchars($ingreso['id']) ?></td>
+                                <td><?= htmlspecialchars($ingreso['fecha_hora']) ?></td>
+                                <td><?= htmlspecialchars($ingreso['suma_total_kilos']) ?></td>
+                                <td><?= htmlspecialchars($ingreso['suma_valores_por_kilo']) ?></td>
+                                <td>
+                                    <button class="btn btn-primary" onclick="showDocuments(<?= htmlspecialchars($ingreso['id']) ?>)">Documentos</button>
+                                    <span class="status-icon <?= $claseIcono ?>"><?= $icono ?></span>
+                                </td>
+                                <td><button class="btn btn-info" onclick="showDetails(<?= htmlspecialchars($ingreso['id']) ?>)">Detalle</button></td>
+                            </tr>
+                        <?php endforeach; ?>
+                    <?php else: ?>
+                        <tr>
+                            <td colspan="6">No hay datos disponibles</td>
+                        </tr>
+                    <?php endif; ?>
+                </tbody>
+            </table>
         </div>
     </div>
-</div>
 
-<script>
-    const data = <?php echo json_encode($ingresos); ?>;
-    const detalleData = {}; // Objeto de datos detallados vacío para ser llenado desde el backend
+    <!-- Modal para documentos -->
+    <div id="detailModal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <div id="modal-body"></div>
+        </div>
+    </div>
 
-    const tableBody = document.getElementById('data-table');
+    <!-- Modal para detalles -->
+    <div id="detailsModal" class="modal">
+        <div class="modal-content modal-detail-content">
+            <span class="close">&times;</span>
+            <div id="modal-body-detail"></div>
+        </div>
+    </div>
 
-    function populateTable() {
-        tableBody.innerHTML = ''; // Limpiar la tabla antes de poblarla
-
-        data.forEach(item => {
-            const row = document.createElement('tr');
-
-            row.innerHTML = `
-                <td>${item.id}</td>
-                <td>${item.fecha_hora}</td>
-                <td>${item.suma_total_kilos}</td>
-                <td>${item.factura ? `<a href="${item.factura}" target="_blank">Ver documento</a>` : '<input type="file" name="archivo_factura_' + item.id + '" /><button onclick="saveFile(' + item.id + ', \'factura\')">Guardar</button>'}</td>
-                <td>${item.ordenCompra ? `<a href="${item.ordenCompra}" target="_blank">Ver documento</a>` : '<input type="file" name="archivo_ordenCompra_' + item.id + '" /><button onclick="saveFile(' + item.id + ', \'ordenCompra\')">Guardar</button>'}</td>
-                <td>${item.reciboPago ? `<a href="${item.reciboPago}" target="_blank">Ver documento</a>` : '<input type="file" name="archivo_reciboPago_' + item.id + '" /><button onclick="saveFile(' + item.id + ', \'reciboPago\')">Guardar</button>'}</td>
-                <td><button onclick="showDetails(${item.id})">Detalle</button></td>
-                <td><button onclick="editData(${item.id})">Editar</button></td>
-            `;
-
-            tableBody.appendChild(row);
-        });
-    }
-
-    function showDetails(id) {
-        fetch(`?detalle_id=${id}`)
-            .then(response => response.json())
-            .then(detalles => {
-                const modal = document.getElementById('detailModal');
-                const modalBody = document.getElementById('modal-body');
-
-                let detalleHtml = `
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>ID Ingreso</th>
-                                <th>Fecha Ingreso</th>
-                                <th>ID Producto</th>
-                                <th>Nombre Producto</th>
-                                <th>Peso</th>
-                                <th>Valor por Kilo</th>
-                                <th>Nombre Usuario</th>
-                                <th>Nombre Proveedor</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                `;
-
-                detalles.forEach(detalle => {
-                    detalleHtml += `
-                        <tr>
-                            <td>${detalle.id_ingreso}</td>
-                            <td>${detalle.fecha_ingreso}</td>
-                            <td>${detalle.id_producto}</td>
-                            <td>${detalle.nombre_producto}</td>
-                            <td>${detalle.peso}</td>
-                            <td>${detalle.valor_por_kilo}</td>
-                            <td>${detalle.nombre_usuario}</td>
-                            <td>${detalle.nombre_proveedor}</td>
-                        </tr>
-                    `;
-                });
-
-                detalleHtml += `
-                        </tbody>
-                    </table>
-                `;
-
-                modalBody.innerHTML = detalleHtml;
-                modal.style.display = "block";
-            })
-            .catch(error => {
-                console.error('Error al obtener los detalles:', error);
-            });
-    }
-
-    function editData(id) {
-        // Lógica para editar los datos
-        alert(`Editar datos del ID: ${id}`);
-    }
-
-    function saveFile(id, campo) {
-        const input = document.querySelector(`input[name="archivo_${campo}_${id}"]`);
-
-        if (input && input.files.length > 0) {
-            const file = input.files[0];
-            uploadFile(id, file, campo);
-        }
-    }
-
-    function uploadFile(id, file, campo) {
-        const formData = new FormData();
-        formData.append('id', id);
-        formData.append('campo', campo);
-        formData.append('archivo', file);
-
-        fetch('', {
-            method: 'POST',
-            body: formData
-        })
-        .then(response => response.text())
-        .then(data => {
-            console.log(data);
-            // Recargar la página para mostrar los cambios
-            location.reload();
-        })
-        .catch(error => {
-            console.error('Error al subir el archivo:', error);
-        });
-    }
-
-    // Cerrar el modal
-    const modal = document.getElementById('detailModal');
-    const span = document.getElementsByClassName("close")[0];
-
-    span.onclick = function() {
-        modal.style.display = "none";
-    }
-
-    window.onclick = function(event) {
-        if (event.target == modal) {
-            modal.style.display = "none";
-        }
-    }
-
-    // Poblar la tabla al cargar la página
-    populateTable();
-</script>
-
+    <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
+    <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
+    <script src="https://cdn.datatables.net/1.11.5/js/jquery.dataTables.min.js"></script>
+    <script src="https://cdn.datatables.net/1.11.5/js/dataTables.bootstrap4.min.js"></script>
+    <script src="https://cdn.datatables.net/colreorder/1.5.2/js/dataTables.colReorder.min.js"></script>
+    <script src="https://cdn.datatables.net/buttons/1.7.1/js/dataTables.buttons.min.js"></script>
+    <script src="https://cdn.datatables.net/buttons/1.7.1/js/buttons.bootstrap4.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.1.3/jszip.min.js"></script>
+    <script src="https://cdn.datatables.net/buttons/1.7.1/js/buttons.html5.min.js"></script>
+    <script src="https://cdn.datatables.net/buttons/1.7.1/js/buttons.print.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+    <script src="./tabladatos.js"></script>
 </body>
 </html>
+                        

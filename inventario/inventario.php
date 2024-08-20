@@ -74,7 +74,7 @@ class Inventario {
         
         try {
             $conexion->beginTransaction();
-
+    
             // Insertar en la tabla 'inventario'
             $consultaInventario = $conexion->prepare("INSERT INTO inventario (id_productoFK, id_usuario, peso, id_proveedor, valorPorKilo) VALUES (:id_productoFK, :id_usuario, :peso, :id_proveedor, :valorPorKilo)");
             $consultaInventario->bindParam(':id_productoFK', $this->id_productoFK);
@@ -83,7 +83,7 @@ class Inventario {
             $consultaInventario->bindParam(':id_proveedor', $this->id_proveedorFK);
             $consultaInventario->bindParam(':valorPorKilo', $this->valorPorKilo);
             $consultaInventario->execute();
-
+    
             // Obtener el ID del último producto insertado en inventario
             $idProducto = $conexion->lastInsertId();
             
@@ -93,10 +93,31 @@ class Inventario {
             $consultaDetalleIngreso->bindParam(':id_inventarioFK', $idProducto);
             $consultaDetalleIngreso->bindParam(':cantidad', $this->peso);
             $consultaDetalleIngreso->execute();
-
+    
+            // Verificar si el id_productoFK ya existe en consolidado_inventario
+            $consultaConsolidado = $conexion->prepare("SELECT existencia FROM consolidado_inventario WHERE id_productoFK = :id_productoFK");
+            $consultaConsolidado->bindParam(':id_productoFK', $this->id_productoFK);
+            $consultaConsolidado->execute();
+            $resultadoConsolidado = $consultaConsolidado->fetch(PDO::FETCH_ASSOC);
+    
+            if ($resultadoConsolidado) {
+                // Si existe, sumar los kilos nuevos a la existencia
+                $nuevaExistencia = $resultadoConsolidado['existencia'] + $this->peso;
+                $actualizarConsolidado = $conexion->prepare("UPDATE consolidado_inventario SET existencia = :nuevaExistencia WHERE id_productoFK = :id_productoFK");
+                $actualizarConsolidado->bindParam(':nuevaExistencia', $nuevaExistencia);
+                $actualizarConsolidado->bindParam(':id_productoFK', $this->id_productoFK);
+                $actualizarConsolidado->execute();
+            } else {
+                // Si no existe, insertar un nuevo registro
+                $insertarConsolidado = $conexion->prepare("INSERT INTO consolidado_inventario (id_productoFK, existencia) VALUES (:id_productoFK, :existencia)");
+                $insertarConsolidado->bindParam(':id_productoFK', $this->id_productoFK);
+                $insertarConsolidado->bindParam(':existencia', $this->peso);
+                $insertarConsolidado->execute();
+            }
+    
             // Confirmar la transacción
             $conexion->commit();
-
+    
             return true; // Éxito
         } catch (PDOException $e) {
             // Revertir la transacción si hay un error
@@ -105,35 +126,51 @@ class Inventario {
             return false; // Error
         }
     }
-
-    public function mostrarConsolidadoProductos() {
-        $conexion = new Conexion();
-        $consulta = $conexion->query("SELECT p.id_producto, p.nombre AS nombre, p.referencia, p.tipo, 
-                                            SUM(inv.peso) AS total_cantidad,
-                                            SUM(inv.valorPorKilo * inv.peso) AS total_valor
-                                      FROM inventario inv
-                                      INNER JOIN producto p ON inv.id_productoFK = p.id_producto
-                                      GROUP BY p.id_producto");
     
-        if ($consulta->rowCount() > 0) {
-            while ($fila = $consulta->fetch(PDO::FETCH_ASSOC)) {
-                echo "<tr>";
-                echo "<td class='text-center'>" . $fila['id_producto'] . "</td>";
-                echo "<td class='text-center'>" . $fila['nombre'] . "</td>";
-                echo "<td class='text-center'>" . $fila['referencia'] . "</td>";
-                echo "<td class='text-center'>" . $fila['tipo'] . "</td>";
-                echo "<td class='text-center'>" . number_format($fila['total_cantidad'], 0, ',', '.') . "</td>";
-                // Calcular el promedio pagado por kilo
-                $promedio_por_kilo = $fila['total_valor'] / $fila['total_cantidad'];
-                echo "<td class='text-center'>$" . number_format($promedio_por_kilo, 0, ',', '.') . "</td>";
-                echo "</tr>";
+        public function calcularTotalesProducto() {
+            $conexion = new Conexion();
+        
+            // Consulta para calcular los totales desde la tabla consolidado_inventario y el promedio de precios desde la tabla inventario
+            $consulta = $conexion->query("SELECT SUM(ci.existencia) AS total_cantidad,
+                                                 SUM(ci.existencia * inv.promedio_valor_por_kilo) AS total_valor
+                                          FROM consolidado_inventario ci
+                                          INNER JOIN (
+                                              SELECT id_productoFK, AVG(valorPorKilo) AS promedio_valor_por_kilo
+                                              FROM inventario
+                                              GROUP BY id_productoFK
+                                          ) inv ON ci.id_productoFK = inv.id_productoFK");
+        
+            $totales = $consulta->fetch(PDO::FETCH_ASSOC);
+            $conexion = null;
+        
+            // Si se encontraron resultados, devolver los totales calculados
+            if ($totales) {
+                return $totales;
+            } else {
+                return ['total_cantidad' => 0, 'total_valor' => 0];
             }
-        } else {
-            echo "<tr><td colspan='6' class='text-center'>No se encontraron datos de inventario.</td></tr>";
         }
-    
-        $conexion = null;
-    }
+
+        public function obtenerDetallesInventario() {
+            $conexion = new Conexion();
+            
+            $consulta = $conexion->query("
+                SELECT p.id_producto, p.nombre AS nombre_producto, p.referencia, p.tipo,
+                       ci.existencia AS total_kilos,
+                       AVG(inv.valorPorKilo) AS promedio_valor_por_kilo
+                FROM consolidado_inventario ci
+                INNER JOIN producto p ON ci.id_productoFK = p.id_producto
+                LEFT JOIN inventario inv ON ci.id_productoFK = inv.id_productoFK
+                GROUP BY p.id_producto, p.nombre, p.referencia, p.tipo, ci.existencia
+            ");
+            
+            $detalles = $consulta->fetchAll(PDO::FETCH_ASSOC);
+            $conexion = null;
+            
+            return $detalles;
+        }
+        
+        
     
     
     public function calcularPromedioPagadoPorKilo() {
@@ -405,6 +442,33 @@ class Inventario {
         }
     }
     
+    
+    public function mostrarConsolidadoProductos() {
+        $conexion = new Conexion();
+        $consulta = $conexion->query("SELECT p.id_producto, p.nombre AS nombre, p.referencia, p.tipo, 
+                                            SUM(inv.peso) AS total_cantidad,
+                                            SUM(inv.valorPorKilo * inv.peso) AS total_valor
+                                      FROM inventario inv
+                                      INNER JOIN producto p ON inv.id_productoFK = p.id_producto
+                                      GROUP BY p.id_producto");
+    
+        if ($consulta->rowCount() > 0) {
+            while ($fila = $consulta->fetch(PDO::FETCH_ASSOC)) {
+                echo "<tr>";
+                echo "<td class='text-center'>" . $fila['id_producto'] . "</td>";
+                echo "<td class='text-center'>" . $fila['nombre'] . "</td>";
+                echo "<td class='text-center'>" . $fila['referencia'] . "</td>";
+                echo "<td class='text-center'>" . $fila['tipo'] . "</td>";
+                echo "<td class='text-center'>" . number_format($fila['total_cantidad'], 0, ',', '.') . "</td>";
+                // Calcular el promedio pagado por kilo
+                $promedio_por_kilo = $fila['total_valor'] / $fila['total_cantidad'];
+                echo "<td class='text-center'>$" . number_format($promedio_por_kilo, 0, ',', '.') . "</td>";
+                echo "</tr>";
+            }
+        } else {
+            echo "<tr><td colspan='6' class='text-center'>No se encontraron datos de inventario.</td></tr>";
+        }
+    }
 }
 
 ?>
